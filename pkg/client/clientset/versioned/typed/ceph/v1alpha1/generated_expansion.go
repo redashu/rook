@@ -20,6 +20,8 @@ type ClusterExpansion interface{}
 
 type FilesystemExpansion interface{}
 
+type NFSGaneshaExpansion interface{}
+
 type ObjectStoreExpansion interface{}
 
 type PoolExpansion interface{}
