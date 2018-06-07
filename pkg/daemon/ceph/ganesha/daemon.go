@@ -23,7 +23,6 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/coreos/pkg/capnslog"
 	"github.com/rook/rook/pkg/clusterd"
@@ -33,6 +32,7 @@ import (
 var logger = capnslog.NewPackageLogger("github.com/rook/rook", "ganesha")
 
 const (
+	cephConfigPath    = "/etc/ceph/ceph.conf"
 	ganeshaConfigPath = "/etc/ganesha/ganesha.conf"
 	ganeshaConfig     = `NFS_CORE_PARAM {
 	Enable_NLM = false;
@@ -125,23 +125,21 @@ func generateGaneshaConfig(config *Config) string {
 		"$(EXPORT_POOL)", config.Pool,
 		"$(EXPORT_OBJECT)", config.Object,
 		"$(USER_ID)", "admin",
-		"$(CEPH_CONFIG_PATH)", ganeshaConfigPath)
+		"$(CEPH_CONFIG_PATH)", cephConfigPath)
 	return r.Replace(ganeshaConfig)
 }
 
 func startGanesha(context *clusterd.Context, config *Config) error {
-
 	logger.Infof("starting rpcbind for ganesha")
 	if err := context.Executor.ExecuteCommand(false, "", "rpcbind"); err != nil {
 		return fmt.Errorf("failed to start mds. %+v", err)
 	}
 
 	logger.Infof("starting ganesha from pool %s and object %s", config.Pool, config.Object)
-	if err := context.Executor.ExecuteCommand(false, "", "ganesha.nfsd"); err != nil {
+	if err := context.Executor.ExecuteCommand(false, "", "ganesha.nfsd", "-L", "/var/log/ganesha.log", "-N", "NIV_DEBUG"); err != nil {
 		return fmt.Errorf("failed to start ganesha. %+v", err)
 	}
 
 	logger.Infof("started ganesha")
-	time.Sleep(10 * time.Second)
 	return nil
 }
