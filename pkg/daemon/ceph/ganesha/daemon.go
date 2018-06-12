@@ -136,7 +136,7 @@ func startGanesha(context *clusterd.Context, config *Config) error {
 	}
 
 	logger.Infof("starting ganesha from pool %s and object %s", config.Pool, config.Object)
-	if err := context.Executor.ExecuteCommand(false, "", "ganesha.nfsd", "-L", "/var/log/ganesha.log", "-N", "NIV_DEBUG"); err != nil {
+	if err := context.Executor.ExecuteCommand(false, "", "ganesha.nfsd", "-L", "STDOUT", "-N", "NIV_DEBUG"); err != nil {
 		return fmt.Errorf("failed to start ganesha. %+v", err)
 	}
 
