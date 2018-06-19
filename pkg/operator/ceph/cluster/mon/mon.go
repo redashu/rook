@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/coreos/pkg/capnslog"
@@ -70,7 +71,6 @@ type Cluster struct {
 	Namespace            string
 	Keyring              string
 	Version              string
-	MasterHost           string
 	Size                 int
 	AllowMultiplePerNode bool
 	Port                 int32
@@ -90,9 +90,10 @@ type Cluster struct {
 
 // monConfig for a single monitor
 type monConfig struct {
-	Name     string
-	PublicIP string
-	Port     int32
+	Name       string
+	DaemonName string
+	PublicIP   string
+	Port       int32
 }
 
 // Mapping mon node and port mapping
@@ -215,16 +216,31 @@ func (c *Cluster) initMonConfig(size int) []*monConfig {
 
 	// initialize the mon pod info for mons that have been previously created
 	for _, monitor := range c.clusterInfo.Monitors {
-		mons = append(mons, &monConfig{Name: monitor.Name, Port: int32(mon.DefaultPort)})
+		mons = append(mons, &monConfig{Name: monitor.Name, DaemonName: daemonName(monitor.Name), Port: int32(mon.DefaultPort)})
 	}
 
 	// initialize mon info if we don't have enough mons (at first startup)
 	for i := len(c.clusterInfo.Monitors); i < size; i++ {
 		c.maxMonID++
-		mons = append(mons, &monConfig{Name: fmt.Sprintf("%s%d", appName, c.maxMonID), Port: int32(mon.DefaultPort)})
+		mons = append(mons, newMonConfig(c.maxMonID))
 	}
 
 	return mons
+}
+
+func newMonConfig(monID int) *monConfig {
+	daemonName := indexToName(monID)
+	return &monConfig{Name: fmt.Sprintf("%s-%s", appName, daemonName), DaemonName: daemonName, Port: int32(mon.DefaultPort)}
+}
+
+// Extract the daemon name from the full deployment name.
+func daemonName(fullName string) string {
+	prefix := appName + "-"
+	if strings.HasPrefix(fullName, prefix) {
+		return fullName[len(prefix):]
+	}
+	// If the deployment name did not have the prefix, we have a legacy daemon name that was in the form rook-ceph-mon0 and should not change
+	return fullName
 }
 
 func (c *Cluster) initMonIPs(mons []*monConfig) error {
@@ -243,14 +259,14 @@ func (c *Cluster) initMonIPs(mons []*monConfig) error {
 			}
 			m.PublicIP = serviceIP
 		}
-		c.clusterInfo.Monitors[m.Name] = mon.ToCephMon(m.Name, m.PublicIP, m.Port)
+		c.clusterInfo.Monitors[m.DaemonName] = mon.ToCephMon(m.DaemonName, m.PublicIP, m.Port)
 	}
 
 	return nil
 }
 
 func (c *Cluster) createService(mon *monConfig) (string, error) {
-	labels := c.getLabels(mon.Name)
+	labels := c.getLabels(mon.DaemonName)
 	s := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            mon.Name,
@@ -289,7 +305,7 @@ func (c *Cluster) createService(mon *monConfig) (string, error) {
 		return "", nil
 	}
 
-	logger.Infof("mon %s running at %s:%d", mon.Name, s.Spec.ClusterIP, mon.Port)
+	logger.Infof("mon %s running at %s:%d", mon.DaemonName, s.Spec.ClusterIP, mon.Port)
 	return s.Spec.ClusterIP, nil
 }
 
