@@ -72,8 +72,7 @@ userid = '$(USER_ID)';
 )
 
 type Config struct {
-	Pool        string
-	Object      string
+	Name        string
 	ClusterInfo *mon.ClusterInfo
 }
 
@@ -142,7 +141,7 @@ func startGanesha(context *clusterd.Context, config *Config) error {
 		return fmt.Errorf("failed to start mds. %+v", err)
 	}
 
-	logger.Infof("starting ganesha from pool %s and object %s", config.Pool, config.Object)
+	logger.Infof("starting ganesha server %s", config.Name)
 	// For debug logging, add the params: "-N", "NIV_DEBUG"
 	if err := context.Executor.ExecuteCommand(false, "", "ganesha.nfsd", "-F", "-L", "STDOUT"); err != nil {
 		return fmt.Errorf("failed to start ganesha. %+v", err)
